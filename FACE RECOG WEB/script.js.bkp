@@ -1,0 +1,150 @@
+// ===================================
+// FaceID AI — Scroll Reveal + Interactions
+// ===================================
+
+document.addEventListener('DOMContentLoaded', () => {
+
+    // ═══ Lenis Smooth Scroll ═══
+    const lenis = new Lenis({
+        duration: 1.2,
+        easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+        orientation: 'vertical',
+        gestureOrientation: 'vertical',
+        smoothWheel: true,
+        wheelMultiplier: 1,
+        smoothTouch: false,
+        touchMultiplier: 2,
+    });
+
+    function raf(time) {
+        lenis.raf(time);
+        requestAnimationFrame(raf);
+    }
+    requestAnimationFrame(raf);
+
+    // ═══ Scroll Reveal ═══
+    const els = document.querySelectorAll('.reveal');
+    const obs = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                // Stagger within same parent
+                const parent = entry.target.parentElement;
+                const siblings = [...parent.querySelectorAll('.reveal')];
+                const i = siblings.indexOf(entry.target);
+                setTimeout(() => entry.target.classList.add('vis'), i * 110);
+                obs.unobserve(entry.target);
+            }
+        });
+    }, { threshold: 0.1, rootMargin: '0px 0px -30px 0px' });
+    els.forEach(el => obs.observe(el));
+
+    // ═══ Alphabet-by-Alphabet Reveal ═══
+    const splitTexts = document.querySelectorAll('.split-text');
+    const allChars = [];
+    
+    splitTexts.forEach(el => {
+        // Function to recursively wrap text nodes in spans
+        function wrapTextNodes(node) {
+            if (node.nodeType === 3) { // Text node
+                const text = node.textContent;
+                const frag = document.createDocumentFragment();
+                for (let i = 0; i < text.length; i++) {
+                    const char = text[i];
+                    if (char === ' ') {
+                        frag.appendChild(document.createTextNode(' '));
+                    } else {
+                        const span = document.createElement('span');
+                        span.className = 'char';
+                        span.textContent = char;
+                        frag.appendChild(span);
+                    }
+                }
+                node.replaceWith(frag);
+            } else if (node.nodeType === 1 && node.nodeName !== 'SCRIPT' && node.nodeName !== 'STYLE') {
+                Array.from(node.childNodes).forEach(wrapTextNodes);
+            }
+        }
+        wrapTextNodes(el);
+        allChars.push(...el.querySelectorAll('.char'));
+    });
+
+    window.addEventListener('scroll', () => {
+        const scrollPos = window.scrollY + window.innerHeight * 0.75;
+        allChars.forEach(char => {
+            const rect = char.getBoundingClientRect();
+            const charTop = rect.top + window.scrollY;
+            if (scrollPos > charTop) {
+                char.classList.add('vis');
+            } else {
+                char.classList.remove('vis');
+            }
+        });
+    }, { passive: true });
+
+    // ═══ Navbar scroll ═══
+    const nav = document.getElementById('nav');
+    window.addEventListener('scroll', () => {
+        nav.classList.toggle('scrolled', scrollY > 50);
+    }, { passive: true });
+
+    // ═══ Mobile menu ═══
+    const burger = document.getElementById('burger');
+    const menu = document.getElementById('navMenu');
+    if (burger && menu) {
+        burger.addEventListener('click', () => {
+            burger.classList.toggle('active');
+            menu.classList.toggle('open');
+            document.body.style.overflow = menu.classList.contains('open') ? 'hidden' : '';
+        });
+        menu.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
+            burger.classList.remove('active');
+            menu.classList.remove('open');
+            document.body.style.overflow = '';
+        }));
+    }
+
+    // ═══ Smooth scroll ═══
+    document.querySelectorAll('a[href^="#"]').forEach(a => {
+        a.addEventListener('click', e => {
+            e.preventDefault();
+            const t = document.querySelector(a.getAttribute('href'));
+            if (t) window.scrollTo({ top: t.offsetTop - nav.offsetHeight - 20, behavior: 'smooth' });
+        });
+    });
+
+    // ═══ Stat counters ═══
+    let counted = false;
+    const nums = document.querySelectorAll('.m-num[data-target]');
+    const mObs = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting && !counted) {
+                counted = true;
+                nums.forEach(el => {
+                    const target = +el.dataset.target;
+                    const dur = 2000;
+                    const t0 = performance.now();
+                    (function tick(now) {
+                        const p = Math.min((now - t0) / dur, 1);
+                        el.textContent = Math.round((1 - Math.pow(1 - p, 4)) * target);
+                        if (p < 1) requestAnimationFrame(tick);
+                    })(t0);
+                });
+            }
+        });
+    }, { threshold: 0.3 });
+    const mSec = document.querySelector('.metrics');
+    if (mSec) mObs.observe(mSec);
+
+    // ═══ Active nav ═══
+    const secs = document.querySelectorAll('section[id]');
+    const links = menu ? menu.querySelectorAll('a') : [];
+    window.addEventListener('scroll', () => {
+        let cur = '';
+        secs.forEach(s => {
+            if (scrollY + nav.offsetHeight + 100 >= s.offsetTop) cur = s.id;
+        });
+        links.forEach(l => {
+            l.style.color = l.getAttribute('href') === '#' + cur ? 'var(--t1)' : '';
+        });
+    }, { passive: true });
+});
